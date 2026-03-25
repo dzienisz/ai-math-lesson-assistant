@@ -1,22 +1,19 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth/server";
 import { query, queryOne } from "@/lib/db";
 import type { DBTeacher, DBLesson, DBWeakness, DBHomework } from "@/types";
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const neonAuth = requireAuth();
+    const { data: session } = await neonAuth.getSession();
+    if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const teacher = await queryOne<DBTeacher>(
       "SELECT * FROM teachers WHERE user_id = $1",
-      [user.id]
+      [session.user.id]
     );
     if (!teacher) {
       return NextResponse.json({ error: "Teacher not found" }, { status: 403 });

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth/server";
+import { supabaseStorage } from "@/lib/supabase/storage";
 import { query, queryOne } from "@/lib/db";
 import { triggerNextStep } from "@/utils/background";
 import type { DBTeacher } from "@/types";
@@ -9,14 +10,13 @@ export const maxDuration = 60;
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const neonAuth = requireAuth();
+    const { data: session } = await neonAuth.getSession();
+    if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const userId = session.user.id;
 
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
@@ -54,10 +54,26 @@ export async function POST(request: Request) {
       );
     }
 
+    // Ensure user + teacher records exist (auto-provision on first upload)
+    const existingUser = await queryOne(
+      "SELECT id FROM users WHERE id = $1",
+      [userId]
+    );
+    if (!existingUser) {
+      await query(
+        "INSERT INTO users (id, email, role) VALUES ($1, $2, 'teacher')",
+        [userId, session.user.email]
+      );
+      await query(
+        "INSERT INTO teachers (user_id, name) VALUES ($1, $2)",
+        [userId, session.user.name || session.user.email?.split("@")[0] || "Teacher"]
+      );
+    }
+
     // Get teacher record
     const teacher = await queryOne<DBTeacher>(
       "SELECT * FROM teachers WHERE user_id = $1",
-      [user.id]
+      [userId]
     );
     if (!teacher) {
       return NextResponse.json(
@@ -67,11 +83,16 @@ export async function POST(request: Request) {
     }
 
     // Upload to Supabase Storage
+    const storage = supabaseStorage();
+    if (!storage) {
+      throw new Error("Storage is not configured. Check SUPABASE_URL and SERVICE_ROLE_KEY.");
+    }
+
     const ext = file.name.split(".").pop() || "mp3";
     const fileName = `${uuidv4()}.${ext}`;
     const storagePath = `lessons/${teacher.id}/${fileName}`;
 
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError } = await storage.storage
       .from("lesson-files")
       .upload(storagePath, file, {
         contentType: file.type,
@@ -85,7 +106,7 @@ export async function POST(request: Request) {
     // Get public URL
     const {
       data: { publicUrl },
-    } = supabase.storage.from("lesson-files").getPublicUrl(storagePath);
+    } = storage.storage.from("lesson-files").getPublicUrl(storagePath);
 
     // Create lesson record
     const lessonRows = await query<{ id: string }>(

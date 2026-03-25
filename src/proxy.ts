@@ -1,13 +1,7 @@
-import { type NextRequest } from "next/server";
-import { updateSession } from "@/lib/supabase/middleware";
+import { authMiddleware } from "@/lib/auth/server";
 
-export async function proxy(request: NextRequest) {
-  return await updateSession(request);
-}
+export default authMiddleware;
 
 export const config = {
-  matcher: [
-    // Match all routes except static files and API internals
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
+  matcher: ["/dashboard/:path*", "/upload/:path*"],
 };

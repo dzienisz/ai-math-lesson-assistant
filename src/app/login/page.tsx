@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { BookOpen, Mail, Lock, Loader2 } from "lucide-react";
+import { authClient } from "@/lib/auth/client";
+import { BookOpen, Mail, Lock, Loader2, User as UserIcon } from "lucide-react";
 
 export default function LoginPage() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -12,35 +13,27 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  const supabase = createSupabaseBrowserClient();
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase) {
-      setError("Supabase is not configured. Check your environment variables.");
-      return;
-    }
     setLoading(true);
     setError(null);
     setMessage(null);
 
     try {
       if (mode === "signup") {
-        const { error: signUpError } = await supabase.auth.signUp({
+        const { error: signUpError } = await authClient.signUp.email({
+          name: name || email.split("@")[0],
           email,
           password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/api/auth/callback`,
-          },
         });
-        if (signUpError) throw signUpError;
-        setMessage("Check your email for the confirmation link!");
+        if (signUpError) throw new Error(signUpError.message || "Failed to create account");
+        window.location.href = "/dashboard";
       } else {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
+        const { error: signInError } = await authClient.signIn.email({
           email,
           password,
         });
-        if (signInError) throw signInError;
+        if (signInError) throw new Error(signInError.message || "Failed to sign in");
         window.location.href = "/dashboard";
       }
     } catch (err) {
@@ -68,6 +61,24 @@ export default function LoginPage() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="bg-white border rounded-xl p-6 space-y-4">
+          {mode === "signup" && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Name
+              </label>
+              <div className="relative">
+                <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Your name"
+                  className="w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                />
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Email

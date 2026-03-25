@@ -2,34 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { authClient } from "@/lib/auth/client";
 import { useEffect, useState } from "react";
 import { BookOpen, Upload, LayoutDashboard, LogOut, LogIn } from "lucide-react";
 
 export function NavBar() {
   const pathname = usePathname();
   const [loggedIn, setLoggedIn] = useState(false);
-  const supabase = createSupabaseBrowserClient();
 
   useEffect(() => {
-    if (!supabase) return;
-
-    supabase.auth.getUser().then(({ data }) => {
-      setLoggedIn(!!data.user);
+    authClient.getSession().then(({ data }) => {
+      setLoggedIn(!!data?.user);
     });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setLoggedIn(!!session?.user);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [supabase]);
+  }, [pathname]);
 
   const handleLogout = async () => {
-    if (!supabase) return;
-    await supabase.auth.signOut();
+    await authClient.signOut();
     window.location.href = "/login";
   };
 
