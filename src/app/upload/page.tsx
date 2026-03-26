@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { Upload, FileAudio, X, Loader2, CheckCircle2 } from "lucide-react";
+import { useState, useCallback, useRef, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Upload, FileAudio, X, Loader2, CheckCircle2, GraduationCap } from "lucide-react";
 
 const ALLOWED_EXTENSIONS = [
   ".mp3", ".mp4", ".wav", ".webm", ".ogg", ".flac", ".m4a",
@@ -10,14 +10,42 @@ const ALLOWED_EXTENSIONS = [
 const MAX_SIZE_MB = 500;
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 
+interface StudentOption {
+  id: string;
+  name: string;
+  grade: string | null;
+}
+
 export default function UploadPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-gray-400" /></div>}>
+      <UploadPageInner />
+    </Suspense>
+  );
+}
+
+function UploadPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Student selection
+  const [students, setStudents] = useState<StudentOption[]>([]);
+  const [selectedStudentId, setSelectedStudentId] = useState<string>(searchParams.get("studentId") || "");
+  const [loadingStudents, setLoadingStudents] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/students")
+      .then((r) => r.json())
+      .then((data) => setStudents(data.students || []))
+      .catch(() => {})
+      .finally(() => setLoadingStudents(false));
+  }, []);
 
   const validateFile = (f: File): string | null => {
     const ext = "." + f.name.split(".").pop()?.toLowerCase();
@@ -59,6 +87,9 @@ export default function UploadPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      if (selectedStudentId) {
+        formData.append("studentId", selectedStudentId);
+      }
 
       const res = await fetch("/api/upload", {
         method: "POST",
@@ -90,6 +121,32 @@ export default function UploadPage() {
         Upload an audio or video recording of a math lesson. The AI pipeline
         will automatically transcribe, analyze, and generate homework.
       </p>
+
+      {/* Student selector */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          <GraduationCap className="w-4 h-4 inline mr-1" />
+          Student
+        </label>
+        {loadingStudents ? (
+          <div className="flex items-center gap-2 text-sm text-gray-400"><Loader2 className="w-4 h-4 animate-spin" /> Loading students...</div>
+        ) : students.length === 0 ? (
+          <p className="text-sm text-gray-500">No students yet. <a href="/dashboard" className="text-purple-600 hover:underline">Invite a student first.</a></p>
+        ) : (
+          <select
+            value={selectedStudentId}
+            onChange={(e) => setSelectedStudentId(e.target.value)}
+            className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+          >
+            <option value="">Select a student...</option>
+            {students.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}{s.grade ? ` (Grade ${s.grade})` : ""}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
 
       {/* Drop zone */}
       <div
@@ -173,7 +230,7 @@ export default function UploadPage() {
       {/* Upload button */}
       <button
         onClick={handleUpload}
-        disabled={!file || uploading}
+        disabled={!file || uploading || !selectedStudentId}
         className={`
           mt-6 w-full py-3 px-6 rounded-lg font-medium text-white
           transition-colors duration-200 flex items-center justify-center gap-2

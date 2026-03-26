@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Video, Loader2, CheckCircle2, Link as LinkIcon, Radio } from "lucide-react";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Video, Loader2, CheckCircle2, Link as LinkIcon, Radio, GraduationCap } from "lucide-react";
 
 const SUPPORTED_PLATFORMS = [
   { name: "Google Meet", prefix: "https://meet.google.com/", placeholder: "https://meet.google.com/abc-defg-hij" },
@@ -10,12 +10,40 @@ const SUPPORTED_PLATFORMS = [
   { name: "Microsoft Teams", prefix: "https://teams.microsoft.com/", placeholder: "https://teams.microsoft.com/l/meetup-join/..." },
 ];
 
+interface StudentOption {
+  id: string;
+  name: string;
+  grade: string | null;
+}
+
 export default function LiveLessonPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-gray-400" /></div>}>
+      <LiveLessonPageInner />
+    </Suspense>
+  );
+}
+
+function LiveLessonPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [meetingUrl, setMeetingUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Student selection
+  const [students, setStudents] = useState<StudentOption[]>([]);
+  const [selectedStudentId, setSelectedStudentId] = useState<string>(searchParams.get("studentId") || "");
+  const [loadingStudents, setLoadingStudents] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/students")
+      .then((r) => r.json())
+      .then((data) => setStudents(data.students || []))
+      .catch(() => {})
+      .finally(() => setLoadingStudents(false));
+  }, []);
 
   const handleStart = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +56,7 @@ export default function LiveLessonPage() {
       const res = await fetch("/api/live-lesson", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ meetingUrl: meetingUrl.trim() }),
+        body: JSON.stringify({ meetingUrl: meetingUrl.trim(), studentId: selectedStudentId || undefined }),
       });
 
       const data = await res.json();
@@ -77,6 +105,32 @@ export default function LiveLessonPage() {
 
       {/* Form */}
       <form onSubmit={handleStart} className="space-y-4">
+        {/* Student selector */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            <GraduationCap className="w-4 h-4 inline mr-1" />
+            Student
+          </label>
+          {loadingStudents ? (
+            <div className="flex items-center gap-2 text-sm text-gray-400"><Loader2 className="w-4 h-4 animate-spin" /> Loading students...</div>
+          ) : students.length === 0 ? (
+            <p className="text-sm text-gray-500">No students yet. <a href="/dashboard" className="text-purple-600 hover:underline">Invite a student first.</a></p>
+          ) : (
+            <select
+              value={selectedStudentId}
+              onChange={(e) => setSelectedStudentId(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="">Select a student...</option>
+              {students.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}{s.grade ? ` (Grade ${s.grade})` : ""}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Meeting Link
@@ -122,11 +176,11 @@ export default function LiveLessonPage() {
 
         <button
           type="submit"
-          disabled={!meetingUrl.trim() || loading}
+          disabled={!meetingUrl.trim() || loading || !selectedStudentId}
           className={`
             w-full py-3 px-6 rounded-lg font-medium text-white
             transition-colors duration-200 flex items-center justify-center gap-2
-            ${!meetingUrl.trim() || loading
+            ${!meetingUrl.trim() || loading || !selectedStudentId
               ? "bg-gray-300 cursor-not-allowed"
               : "bg-red-600 hover:bg-red-700"
             }
