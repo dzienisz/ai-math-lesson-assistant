@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { authClient } from "@/lib/auth/client";
 import { useEffect, useState } from "react";
-import { BookOpen, Upload, LayoutDashboard, LogOut, LogIn, Radio, Shield, GraduationCap, User } from "lucide-react";
+import { BookOpen, Upload, LayoutDashboard, LogOut, LogIn, Radio, Shield, GraduationCap, User, Users } from "lucide-react";
 
 interface UserInfo {
   id: string;
@@ -40,6 +40,7 @@ export function NavBar() {
   }, [pathname]);
 
   const isStudent = userInfo?.role === "student";
+  const isAdmin = userInfo?.role === "admin";
 
   const handleLogout = async () => {
     await authClient.signOut();
@@ -82,6 +83,12 @@ export function NavBar() {
                       <span className="hidden sm:inline">Live</span>
                     </Link>
                   </>
+                )}
+                {isAdmin && (
+                  <Link href="/dashboard/teachers" className={linkClass("/dashboard/teachers")}>
+                    <Users className="w-4 h-4" />
+                    <span className="hidden sm:inline">Teachers</span>
+                  </Link>
                 )}
 
                 {/* User info */}
