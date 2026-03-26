@@ -37,32 +37,50 @@ export async function queryOne<T = Record<string, unknown>>(
   return rows[0] ?? null;
 }
 
+// Resolve the current session into a { user, role } without auto-creating anything.
+export async function getUserRole(userId: string): Promise<string | null> {
+  const user = await queryOne<DBUser>("SELECT role FROM users WHERE id = $1", [userId]);
+  return user?.role ?? null;
+}
+
+// Get the student record for an authenticated student user.
+export async function getStudentByUserId(userId: string): Promise<DBStudent | null> {
+  return queryOne<DBStudent>("SELECT * FROM students WHERE user_id = $1", [userId]);
+}
+
 // Ensure a user + teacher record exists for the authenticated user.
-// Auto-provisions on first access; returns the teacher row.
+// Only auto-provisions for new users (self-registration) or existing teacher/admin roles.
+// Uses ON CONFLICT to handle race conditions from concurrent requests.
 export async function ensureTeacher(session: {
   user: { id: string; email?: string; name?: string };
 }): Promise<DBTeacher> {
   const { id: userId, email, name } = session.user;
 
+  // Fast path: teacher record already exists
   const existing = await queryOne<DBTeacher>(
     "SELECT * FROM teachers WHERE user_id = $1",
     [userId]
   );
   if (existing) return existing;
 
-  // Create user row if missing
-  const userExists = await queryOne("SELECT id FROM users WHERE id = $1", [userId]);
-  if (!userExists) {
-    await query(
-      "INSERT INTO users (id, email, role) VALUES ($1, $2, 'teacher')",
-      [userId, email ?? "unknown"]
-    );
+  // Check current role (if user exists in DB)
+  const role = await getUserRole(userId);
+
+  // Students must NOT be auto-provisioned as teachers
+  if (role === "student") {
+    throw new Error("Students cannot access teacher features");
   }
 
-  // Create teacher row
+  // Create user row if missing (self-registration → defaults to teacher)
+  await query(
+    "INSERT INTO users (id, email, role) VALUES ($1, $2, 'teacher') ON CONFLICT (id) DO NOTHING",
+    [userId, email ?? "unknown"]
+  );
+
+  // Create teacher row (ON CONFLICT guards against race conditions)
   const displayName = name || email?.split("@")[0] || "Teacher";
   await query(
-    "INSERT INTO teachers (user_id, name) VALUES ($1, $2)",
+    "INSERT INTO teachers (user_id, name) VALUES ($1, $2) ON CONFLICT (user_id) DO NOTHING",
     [userId, displayName]
   );
 
@@ -72,17 +90,6 @@ export async function ensureTeacher(session: {
   );
   if (!teacher) throw new Error("Failed to create teacher profile");
   return teacher;
-}
-
-// Get the role of the current authenticated user (or null if not in DB yet).
-export async function getUserRole(userId: string): Promise<string | null> {
-  const user = await queryOne<DBUser>("SELECT role FROM users WHERE id = $1", [userId]);
-  return user?.role ?? null;
-}
-
-// Get the student record for an authenticated student user.
-export async function getStudentByUserId(userId: string): Promise<DBStudent | null> {
-  return queryOne<DBStudent>("SELECT * FROM students WHERE user_id = $1", [userId]);
 }
 
 // Accept a pending invitation: create user (student) + student record, mark invite accepted.
