@@ -41,9 +41,25 @@ export interface DBTeacher {
 
 export interface DBStudent {
   id: string;
+  user_id: string | null;
   teacher_id: string;
   name: string;
   grade: string | null;
+}
+
+export type InvitationStatus = "pending" | "accepted" | "expired";
+
+export interface DBInvitation {
+  id: string;
+  teacher_id: string;
+  email: string;
+  student_name: string;
+  grade: string | null;
+  token: string;
+  status: InvitationStatus;
+  accepted_by: string | null;
+  created_at: string;
+  expires_at: string;
 }
 
 export interface DBLesson {

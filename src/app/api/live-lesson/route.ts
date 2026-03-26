@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/server";
-import { query, queryOne } from "@/lib/db";
+import { query, ensureTeacher } from "@/lib/db";
 import { createBot } from "@/services/meeting/recall";
-import type { DBTeacher } from "@/types";
 
 export async function POST(request: Request) {
   try {
@@ -38,33 +37,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Ensure teacher record exists
-    const userId = session.user.id;
-    const existingUser = await queryOne(
-      "SELECT id FROM users WHERE id = $1",
-      [userId]
-    );
-    if (!existingUser) {
-      await query(
-        "INSERT INTO users (id, email, role) VALUES ($1, $2, 'teacher')",
-        [userId, session.user.email]
-      );
-      await query(
-        "INSERT INTO teachers (user_id, name) VALUES ($1, $2)",
-        [userId, session.user.name || session.user.email?.split("@")[0] || "Teacher"]
-      );
-    }
-
-    const teacher = await queryOne<DBTeacher>(
-      "SELECT * FROM teachers WHERE user_id = $1",
-      [userId]
-    );
-    if (!teacher) {
-      return NextResponse.json(
-        { error: "Teacher profile not found" },
-        { status: 403 }
-      );
-    }
+    const teacher = await ensureTeacher(session);
 
     // Create lesson record
     const lessonRows = await query<{ id: string }>(

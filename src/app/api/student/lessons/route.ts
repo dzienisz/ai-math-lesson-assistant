@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/server";
-import { query, queryOne, ensureTeacher } from "@/lib/db";
+import { query, queryOne, getStudentByUserId } from "@/lib/db";
 import type { DBLesson, DBWeakness, DBHomework } from "@/types";
 
+// GET — student views their own lessons
 export async function GET(request: Request) {
   try {
     const neonAuth = requireAuth();
@@ -11,23 +12,21 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const teacher = await ensureTeacher(session);
+    const student = await getStudentByUserId(session.user.id);
+    if (!student) {
+      return NextResponse.json({ error: "Student profile not found" }, { status: 403 });
+    }
 
-    // Check for specific lesson ID
     const { searchParams } = new URL(request.url);
     const lessonId = searchParams.get("id");
 
     if (lessonId) {
-      // Return single lesson with weaknesses and homework
       const lesson = await queryOne<DBLesson>(
-        "SELECT * FROM lessons WHERE id = $1 AND teacher_id = $2",
-        [lessonId, teacher.id]
+        "SELECT * FROM lessons WHERE id = $1 AND student_id = $2",
+        [lessonId, student.id]
       );
       if (!lesson) {
-        return NextResponse.json(
-          { error: "Lesson not found" },
-          { status: 404 }
-        );
+        return NextResponse.json({ error: "Lesson not found" }, { status: 404 });
       }
 
       const weaknesses = await query<DBWeakness>(
@@ -43,15 +42,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ lesson, weaknesses, homework });
     }
 
-    // Return all lessons for this teacher
     const lessons = await query<DBLesson>(
-      "SELECT * FROM lessons WHERE teacher_id = $1 ORDER BY created_at DESC",
-      [teacher.id]
+      "SELECT * FROM lessons WHERE student_id = $1 ORDER BY created_at DESC",
+      [student.id]
     );
 
     return NextResponse.json({ lessons });
   } catch (err) {
-    console.error("[API] Lessons error:", err);
+    console.error("[API] Student lessons error:", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Internal error" },
       { status: 500 }

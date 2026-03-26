@@ -6,8 +6,8 @@
 const RECALL_API_BASE = "https://us-east-1.recall.ai/api/v1";
 
 function getApiKey(): string {
-  const key = process.env.RECALL_API_KEY;
-  if (!key) throw new Error("RECALL_API_KEY is not set");
+  const key = process.env.ALEMATMA_RECALL_API_KEY;
+  if (!key) throw new Error("ALEMATMA_RECALL_API_KEY is not set");
   return key;
 }
 

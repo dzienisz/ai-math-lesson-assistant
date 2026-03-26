@@ -87,14 +87,13 @@ cp .env.example .env.local
 Fill in all values in `.env.local`:
 
 ```env
-DATABASE_URL=postgresql://...          # Neon connection string
-NEXT_PUBLIC_SUPABASE_URL=https://...   # Supabase project URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...      # Supabase anon key
-SUPABASE_SERVICE_ROLE_KEY=...          # Supabase service role key
-OPENAI_API_KEY=sk-...                  # OpenAI API key
-DEEPGRAM_API_KEY=...                   # Deepgram API key
-PIPELINE_API_SECRET=...                # Any random secret string
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+ALEMATMA_DATABASE_URL=postgresql://...          # Neon connection string
+ALEMATMA_SUPABASE_URL=https://...               # Supabase project URL
+ALEMATMA_SUPABASE_SERVICE_ROLE_KEY=...          # Supabase service role key
+ALEMATMA_OPENAI_API_KEY=sk-...                  # OpenAI API key
+ALEMATMA_DEEPGRAM_API_KEY=...                   # Deepgram API key
+ALEMATMA_PIPELINE_API_SECRET=...                # Any random secret string
+ALEMATMA_APP_URL=http://localhost:3000
 ```
 
 ### 4. Set up database
@@ -165,7 +164,7 @@ Each step:
 
 ### Analysis
 - Default: **OpenAI GPT-4o**
-- Set `USE_ANTHROPIC=true` in `.env.local` to use **Claude** instead
+- Set `ALEMATMA_USE_ANTHROPIC=true` in `.env.local` to use **Claude** instead
 
 ## Future Hooks (Layer 2/3)
 

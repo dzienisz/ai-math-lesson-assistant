@@ -8,8 +8,8 @@ let _auth: NeonAuth | null = null;
 function getAuth(): NeonAuth | null {
   if (_auth) return _auth;
 
-  const baseUrl = process.env.NEON_AUTH_BASE_URL;
-  const secret = process.env.NEON_AUTH_COOKIE_SECRET;
+  const baseUrl = process.env.ALEMATMA_NEON_AUTH_BASE_URL;
+  const secret = process.env.ALEMATMA_NEON_AUTH_COOKIE_SECRET;
 
   if (!baseUrl || !secret) return null;
 
@@ -21,7 +21,7 @@ function getAuth(): NeonAuth | null {
 export function requireAuth(): NeonAuth {
   const instance = getAuth();
   if (!instance) {
-    throw new Error("NEON_AUTH_BASE_URL and NEON_AUTH_COOKIE_SECRET must be set");
+    throw new Error("ALEMATMA_NEON_AUTH_BASE_URL and ALEMATMA_NEON_AUTH_COOKIE_SECRET must be set");
   }
   return instance;
 }

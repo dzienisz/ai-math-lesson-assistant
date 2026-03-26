@@ -54,8 +54,8 @@ export async function triggerNextStep(
   stepUrl: string,
   body: Record<string, unknown>
 ): Promise<void> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  const secret = process.env.PIPELINE_API_SECRET;
+  const appUrl = process.env.ALEMATMA_APP_URL || "http://localhost:3000";
+  const secret = process.env.ALEMATMA_PIPELINE_API_SECRET;
 
   try {
     // Fire and forget — don't await the full response
@@ -78,7 +78,7 @@ export async function triggerNextStep(
  * Verify the pipeline API secret from request headers.
  */
 export function verifyPipelineSecret(headerSecret: string | null): boolean {
-  const expected = process.env.PIPELINE_API_SECRET;
+  const expected = process.env.ALEMATMA_PIPELINE_API_SECRET;
   if (!expected) return true; // No secret configured = allow all (dev mode)
   return headerSecret === expected;
 }

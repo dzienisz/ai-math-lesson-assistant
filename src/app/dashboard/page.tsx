@@ -13,8 +13,12 @@ import {
   ArrowLeft,
   Radio,
   Upload,
+  UserPlus,
+  Copy,
+  Check,
+  GraduationCap,
 } from "lucide-react";
-import type { DBLesson, DBWeakness, DBHomework, LessonStatus } from "@/types";
+import type { DBLesson, DBWeakness, DBHomework, DBInvitation, LessonStatus } from "@/types";
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -49,7 +53,15 @@ function StatusBadge({ status }: { status: LessonStatus }) {
   );
 }
 
+interface UserInfo {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+}
+
 export default function DashboardPage() {
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [lessons, setLessons] = useState<DBLesson[]>([]);
   const [selectedLesson, setSelectedLesson] = useState<DBLesson | null>(null);
   const [weaknesses, setWeaknesses] = useState<DBWeakness[]>([]);
@@ -58,10 +70,31 @@ export default function DashboardPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Invite state (teachers)
+  const [showInviteForm, setShowInviteForm] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteStudentName, setInviteStudentName] = useState("");
+  const [inviteGrade, setInviteGrade] = useState("");
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [invitations, setInvitations] = useState<DBInvitation[]>([]);
+  const [copied, setCopied] = useState(false);
+
+  // Fetch current user info
+  useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((data) => setUserInfo(data.user))
+      .catch(() => {});
+  }, []);
+
+  const isStudent = userInfo?.role === "student";
+  const lessonsEndpoint = isStudent ? "/api/student/lessons" : "/api/lessons";
+
   // Fetch all lessons
   const fetchLessons = useCallback(async () => {
     try {
-      const res = await fetch("/api/lessons");
+      const res = await fetch(lessonsEndpoint);
       if (!res.ok) throw new Error("Failed to load lessons");
       const data = await res.json();
       setLessons(data.lessons || []);
@@ -71,13 +104,13 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [lessonsEndpoint]);
 
   // Fetch single lesson detail
   const fetchLessonDetail = useCallback(async (id: string) => {
     setDetailLoading(true);
     try {
-      const res = await fetch(`/api/lessons?id=${id}`);
+      const res = await fetch(`${lessonsEndpoint}?id=${id}`);
       if (!res.ok) throw new Error("Failed to load lesson");
       const data = await res.json();
       setSelectedLesson(data.lesson);
@@ -88,14 +121,27 @@ export default function DashboardPage() {
     } finally {
       setDetailLoading(false);
     }
-  }, []);
+  }, [lessonsEndpoint]);
+
+  // Fetch invitations (teachers only)
+  const fetchInvitations = useCallback(async () => {
+    if (isStudent) return;
+    try {
+      const res = await fetch("/api/invitations");
+      if (res.ok) {
+        const data = await res.json();
+        setInvitations(data.invitations || []);
+      }
+    } catch { /* ignore */ }
+  }, [isStudent]);
 
   // Polling for status updates
   useEffect(() => {
     fetchLessons();
+    fetchInvitations();
     const interval = setInterval(fetchLessons, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [fetchLessons]);
+  }, [fetchLessons, fetchInvitations]);
 
   // Refresh detail if selected lesson is processing
   useEffect(() => {
@@ -108,6 +154,43 @@ export default function DashboardPage() {
     }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [selectedLesson, fetchLessonDetail]);
+
+  // Create invitation
+  const handleCreateInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setInviteLoading(true);
+    setInviteLink(null);
+    try {
+      const res = await fetch("/api/invitations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: inviteEmail,
+          studentName: inviteStudentName,
+          grade: inviteGrade || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to create invitation");
+      const data = await res.json();
+      setInviteLink(data.inviteLink);
+      setInviteEmail("");
+      setInviteStudentName("");
+      setInviteGrade("");
+      fetchInvitations();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create invitation");
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  const copyInviteLink = () => {
+    if (inviteLink) {
+      navigator.clipboard.writeText(inviteLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   // ---- Detail view ----
   if (selectedLesson) {
@@ -258,18 +341,117 @@ export default function DashboardPage() {
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold">Lessons</h1>
+          <h1 className="text-3xl font-bold">
+            {isStudent ? "My Lessons" : "Lessons"}
+          </h1>
           <p className="text-gray-500 text-sm mt-1">
+            {isStudent && (
+              <span className="inline-flex items-center gap-1 mr-2 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                <GraduationCap className="w-3 h-3" /> Student
+              </span>
+            )}
             {lessons.length} lesson{lessons.length !== 1 ? "s" : ""} — auto-refreshing every {POLL_INTERVAL_MS / 1000}s
           </p>
         </div>
-        <button
-          onClick={fetchLessons}
-          className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-800 border rounded-lg px-3 py-2"
-        >
-          <RefreshCw className="w-4 h-4" /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          {!isStudent && (
+            <button
+              onClick={() => setShowInviteForm(!showInviteForm)}
+              className="flex items-center gap-1.5 text-sm text-purple-600 hover:text-purple-800 border border-purple-200 rounded-lg px-3 py-2"
+            >
+              <UserPlus className="w-4 h-4" /> Invite Student
+            </button>
+          )}
+          <button
+            onClick={fetchLessons}
+            className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-800 border rounded-lg px-3 py-2"
+          >
+            <RefreshCw className="w-4 h-4" /> Refresh
+          </button>
+        </div>
       </div>
+
+      {/* Invite Student Form (teachers only) */}
+      {showInviteForm && !isStudent && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-5 mb-6">
+          <h2 className="text-sm font-semibold text-purple-800 mb-3">Invite a Student</h2>
+          <form onSubmit={handleCreateInvite} className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <input
+                type="text"
+                value={inviteStudentName}
+                onChange={(e) => setInviteStudentName(e.target.value)}
+                required
+                placeholder="Student name"
+                className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+              />
+              <input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                required
+                placeholder="Student email"
+                className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+              />
+              <input
+                type="text"
+                value={inviteGrade}
+                onChange={(e) => setInviteGrade(e.target.value)}
+                placeholder="Grade (optional)"
+                className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="submit"
+                disabled={inviteLoading}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:bg-gray-300 flex items-center gap-2"
+              >
+                {inviteLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                Create Invite Link
+              </button>
+              {inviteLink && (
+                <div className="flex items-center gap-2 flex-1">
+                  <input
+                    type="text"
+                    readOnly
+                    value={inviteLink}
+                    className="flex-1 px-3 py-2 border rounded-lg text-xs bg-white font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={copyInviteLink}
+                    className="px-3 py-2 border rounded-lg text-sm hover:bg-gray-50"
+                  >
+                    {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+              )}
+            </div>
+          </form>
+
+          {/* Existing invitations */}
+          {invitations.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-purple-200">
+              <p className="text-xs font-medium text-purple-700 mb-2">
+                Sent invitations ({invitations.length})
+              </p>
+              <div className="space-y-1">
+                {invitations.map((inv) => (
+                  <div key={inv.id} className="flex items-center justify-between text-xs text-purple-800 bg-white rounded px-3 py-1.5">
+                    <span>{inv.student_name} ({inv.email})</span>
+                    <span className={`px-2 py-0.5 rounded-full font-medium ${
+                      inv.status === "accepted" ? "bg-green-100 text-green-700" :
+                      inv.status === "expired" ? "bg-gray-100 text-gray-500" :
+                      "bg-yellow-100 text-yellow-700"
+                    }`}>{inv.status}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 text-red-700 rounded-lg p-4 text-sm mb-6 border border-red-200">
@@ -285,13 +467,19 @@ export default function DashboardPage() {
         <div className="text-center py-16 text-gray-500">
           <BookOpen className="w-12 h-12 mx-auto mb-4 text-gray-300" />
           <p className="text-lg font-medium">No lessons yet</p>
-          <p className="text-sm mt-1">Upload a lesson recording to get started.</p>
-          <a
-            href="/upload"
-            className="inline-block mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-          >
-            Upload Lesson
-          </a>
+          <p className="text-sm mt-1">
+            {isStudent
+              ? "Your teacher hasn\u2019t assigned any lessons yet."
+              : "Upload a lesson recording to get started."}
+          </p>
+          {!isStudent && (
+            <a
+              href="/upload"
+              className="inline-block mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+            >
+              Upload Lesson
+            </a>
+          )}
         </div>
       ) : (
         <div className="space-y-3">

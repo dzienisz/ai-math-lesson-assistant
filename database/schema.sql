@@ -22,12 +22,27 @@ CREATE TABLE IF NOT EXISTS teachers (
   UNIQUE (user_id)
 );
 
--- Students (belong to a teacher)
+-- Students (belong to a teacher, optionally linked to a user account)
 CREATE TABLE IF NOT EXISTS students (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID UNIQUE REFERENCES users(id) ON DELETE SET NULL,
   teacher_id UUID NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   grade TEXT
+);
+
+-- Invitations (teacher invites student by email)
+CREATE TABLE IF NOT EXISTS invitations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  teacher_id UUID NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  student_name TEXT NOT NULL,
+  grade TEXT,
+  token TEXT UNIQUE NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'expired')),
+  accepted_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '30 days')
 );
 
 -- Lessons — core pipeline entity
@@ -77,4 +92,7 @@ CREATE INDEX IF NOT EXISTS idx_lessons_status ON lessons(status);
 CREATE INDEX IF NOT EXISTS idx_weaknesses_lesson ON weaknesses(lesson_id);
 CREATE INDEX IF NOT EXISTS idx_homework_lesson ON homework(lesson_id);
 CREATE INDEX IF NOT EXISTS idx_teachers_user ON teachers(user_id);
+CREATE INDEX IF NOT EXISTS idx_students_user ON students(user_id);
+CREATE INDEX IF NOT EXISTS idx_invitations_token ON invitations(token);
+CREATE INDEX IF NOT EXISTS idx_invitations_teacher ON invitations(teacher_id);
 CREATE INDEX IF NOT EXISTS idx_lessons_recall_bot ON lessons(recall_bot_id);

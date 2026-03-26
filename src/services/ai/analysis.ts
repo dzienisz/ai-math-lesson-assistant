@@ -20,7 +20,7 @@ Return ONLY valid JSON, no markdown fencing.`;
  * Analyze a lesson transcript using an LLM.
  */
 export async function analyzeLesson(transcript: string): Promise<AnalysisResult> {
-  const useAnthropic = process.env.USE_ANTHROPIC === "true";
+  const useAnthropic = process.env.ALEMATMA_USE_ANTHROPIC === "true";
 
   if (useAnthropic) {
     return analyzeWithClaude(transcript);
@@ -31,8 +31,8 @@ export async function analyzeLesson(transcript: string): Promise<AnalysisResult>
 // ---- OpenAI GPT-4 ----
 
 async function analyzeWithGPT4(transcript: string): Promise<AnalysisResult> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
+  const apiKey = process.env.ALEMATMA_OPENAI_API_KEY;
+  if (!apiKey) throw new Error("ALEMATMA_OPENAI_API_KEY is not set");
 
   const { default: OpenAI } = await import("openai");
   const openai = new OpenAI({ apiKey });
@@ -60,8 +60,8 @@ async function analyzeWithGPT4(transcript: string): Promise<AnalysisResult> {
 // ---- Anthropic Claude ----
 
 async function analyzeWithClaude(transcript: string): Promise<AnalysisResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
+  const apiKey = process.env.ALEMATMA_ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ALEMATMA_ANTHROPIC_API_KEY is not set");
 
   const { default: Anthropic } = await import("@anthropic-ai/sdk");
   const anthropic = new Anthropic({ apiKey });

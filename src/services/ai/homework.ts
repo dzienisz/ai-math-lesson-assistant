@@ -29,8 +29,8 @@ export async function generateHomework(
   weaknesses: DBWeakness[],
   summary: string
 ): Promise<HomeworkResult> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
+  const apiKey = process.env.ALEMATMA_OPENAI_API_KEY;
+  if (!apiKey) throw new Error("ALEMATMA_OPENAI_API_KEY is not set");
 
   const { default: OpenAI } = await import("openai");
   const openai = new OpenAI({ apiKey });

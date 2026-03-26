@@ -12,9 +12,9 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 async function seed() {
-  const url = process.env.DATABASE_URL;
+  const url = process.env.ALEMATMA_DATABASE_URL;
   if (!url) {
-    console.error("❌  DATABASE_URL not set. Copy .env.example to .env.local and fill in your Neon connection string.");
+    console.error("❌  ALEMATMA_DATABASE_URL not set. Copy .env.example to .env.local and fill in your Neon connection string.");
     process.exit(1);
   }
 

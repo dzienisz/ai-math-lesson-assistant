@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/server";
 import { supabaseStorage } from "@/lib/supabase/storage";
-import { query, queryOne } from "@/lib/db";
+import { query, ensureTeacher } from "@/lib/db";
 import { triggerNextStep } from "@/utils/background";
-import type { DBTeacher } from "@/types";
 import { v4 as uuidv4 } from "uuid";
 
 export const maxDuration = 60;
@@ -15,8 +14,6 @@ export async function POST(request: Request) {
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    const userId = session.user.id;
 
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
@@ -54,33 +51,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Ensure user + teacher records exist (auto-provision on first upload)
-    const existingUser = await queryOne(
-      "SELECT id FROM users WHERE id = $1",
-      [userId]
-    );
-    if (!existingUser) {
-      await query(
-        "INSERT INTO users (id, email, role) VALUES ($1, $2, 'teacher')",
-        [userId, session.user.email]
-      );
-      await query(
-        "INSERT INTO teachers (user_id, name) VALUES ($1, $2)",
-        [userId, session.user.name || session.user.email?.split("@")[0] || "Teacher"]
-      );
-    }
-
-    // Get teacher record
-    const teacher = await queryOne<DBTeacher>(
-      "SELECT * FROM teachers WHERE user_id = $1",
-      [userId]
-    );
-    if (!teacher) {
-      return NextResponse.json(
-        { error: "Teacher profile not found. Please complete setup." },
-        { status: 403 }
-      );
-    }
+    const teacher = await ensureTeacher(session);
 
     // Upload to Supabase Storage
     const storage = supabaseStorage();

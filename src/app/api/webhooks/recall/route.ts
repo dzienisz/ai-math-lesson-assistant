@@ -10,7 +10,7 @@ import type { DBLesson, RecallBotEvent } from "@/types";
 export async function POST(request: Request) {
   try {
     // Verify webhook secret if configured
-    const webhookSecret = process.env.RECALL_WEBHOOK_SECRET;
+    const webhookSecret = process.env.ALEMATMA_RECALL_WEBHOOK_SECRET;
     if (webhookSecret) {
       const sig = request.headers.get("x-recall-signature");
       if (sig !== webhookSecret) {

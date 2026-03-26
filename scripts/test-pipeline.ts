@@ -5,11 +5,11 @@
  *   npx tsx scripts/test-pipeline.ts [lessonId]
  *
  * If no lessonId is provided, creates a test lesson and runs the pipeline.
- * Requires: DATABASE_URL, PIPELINE_API_SECRET, and NEXT_PUBLIC_APP_URL in .env.local
+ * Requires: ALEMATMA_DATABASE_URL, ALEMATMA_PIPELINE_API_SECRET, and ALEMATMA_APP_URL in .env.local
  */
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-const SECRET = process.env.PIPELINE_API_SECRET || "";
+const APP_URL = process.env.ALEMATMA_APP_URL || "http://localhost:3000";
+const SECRET = process.env.ALEMATMA_PIPELINE_API_SECRET || "";
 
 async function triggerStep(step: string, body: Record<string, unknown>) {
   console.log(`\n🔄  Triggering ${step}...`);
@@ -51,7 +51,7 @@ async function testPipeline() {
   const transcribed = await triggerStep("transcribe", { lessonId });
   if (!transcribed) {
     console.log("\n⚠️   Transcription failed. Check that:");
-    console.log("   - DEEPGRAM_API_KEY is set");
+    console.log("   - ALEMATMA_DEEPGRAM_API_KEY is set");
     console.log("   - The lesson has a valid file_url");
     console.log("   - The dev server is running (npm run dev)");
     return;
@@ -63,7 +63,7 @@ async function testPipeline() {
   // Step 2: Analysis
   const analyzed = await triggerStep("analyze", { lessonId });
   if (!analyzed) {
-    console.log("\n⚠️   Analysis failed. Check that OPENAI_API_KEY or ANTHROPIC_API_KEY is set.");
+    console.log("\n⚠️   Analysis failed. Check that ALEMATMA_OPENAI_API_KEY or ALEMATMA_ANTHROPIC_API_KEY is set.");
     return;
   }
 
