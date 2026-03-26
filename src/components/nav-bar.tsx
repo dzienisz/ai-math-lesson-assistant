@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { authClient } from "@/lib/auth/client";
 import { useEffect, useState } from "react";
-import { BookOpen, Upload, LayoutDashboard, LogOut, LogIn } from "lucide-react";
+import { BookOpen, Upload, LayoutDashboard, LogOut, LogIn, Radio } from "lucide-react";
 
 export function NavBar() {
   const pathname = usePathname();
@@ -49,6 +49,10 @@ export function NavBar() {
                 <Link href="/upload" className={linkClass("/upload")}>
                   <Upload className="w-4 h-4" />
                   <span className="hidden sm:inline">Upload</span>
+                </Link>
+                <Link href="/live-lesson" className={linkClass("/live-lesson")}>
+                  <Radio className="w-4 h-4" />
+                  <span className="hidden sm:inline">Live</span>
                 </Link>
                 <button
                   onClick={handleLogout}

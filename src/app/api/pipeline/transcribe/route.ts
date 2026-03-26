@@ -33,9 +33,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Lesson not found" }, { status: 404 });
     }
 
+    if (!lesson.file_url) {
+      await query(
+        "UPDATE lessons SET status = $1, error_log = $2 WHERE id = $3",
+        ["error", "No file URL available for transcription", lessonId]
+      );
+      return NextResponse.json({ error: "No file URL" }, { status: 400 });
+    }
+
     // Transcribe with retry
     const result = await withRetry("Transcription", () =>
-      transcribe(lesson.file_url)
+      transcribe(lesson.file_url!)
     );
 
     if (!result.success || !result.data) {

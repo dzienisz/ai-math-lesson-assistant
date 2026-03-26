@@ -5,7 +5,7 @@
 -- Enable UUID generation
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- Users table (synced with Supabase Auth)
+-- Users table (synced with Neon Auth)
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT UNIQUE NOT NULL,
@@ -35,13 +35,18 @@ CREATE TABLE IF NOT EXISTS lessons (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   teacher_id UUID NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
   student_id UUID REFERENCES students(id) ON DELETE SET NULL,
-  file_url TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'upload' CHECK (source IN ('upload', 'live')),
+  meeting_url TEXT,
+  recall_bot_id TEXT,
+  file_url TEXT,
   transcript TEXT,
   summary TEXT,
   understanding_score NUMERIC(5,2),
   status TEXT NOT NULL DEFAULT 'uploaded'
     CHECK (status IN (
-      'uploaded','transcribing','transcribed',
+      'uploaded',
+      'bot_joining','bot_waiting','bot_recording','bot_done','bot_error',
+      'transcribing','transcribed',
       'analyzing','analyzed',
       'generating_homework','ready','error'
     )),
@@ -72,3 +77,4 @@ CREATE INDEX IF NOT EXISTS idx_lessons_status ON lessons(status);
 CREATE INDEX IF NOT EXISTS idx_weaknesses_lesson ON weaknesses(lesson_id);
 CREATE INDEX IF NOT EXISTS idx_homework_lesson ON homework(lesson_id);
 CREATE INDEX IF NOT EXISTS idx_teachers_user ON teachers(user_id);
+CREATE INDEX IF NOT EXISTS idx_lessons_recall_bot ON lessons(recall_bot_id);

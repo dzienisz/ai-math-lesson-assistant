@@ -11,6 +11,8 @@ import {
   RefreshCw,
   ChevronRight,
   ArrowLeft,
+  Radio,
+  Upload,
 } from "lucide-react";
 import type { DBLesson, DBWeakness, DBHomework, LessonStatus } from "@/types";
 
@@ -21,6 +23,11 @@ const STATUS_CONFIG: Record<
   { label: string; color: string; icon: string }
 > = {
   uploaded: { label: "Uploaded", color: "bg-gray-200 text-gray-700", icon: "📤" },
+  bot_joining: { label: "Bot Joining...", color: "bg-cyan-100 text-cyan-800", icon: "🤖" },
+  bot_waiting: { label: "In Waiting Room", color: "bg-cyan-100 text-cyan-800", icon: "⏳" },
+  bot_recording: { label: "Recording Live", color: "bg-red-100 text-red-800", icon: "🔴" },
+  bot_done: { label: "Call Ended", color: "bg-cyan-100 text-cyan-800", icon: "📞" },
+  bot_error: { label: "Bot Error", color: "bg-red-100 text-red-800", icon: "❌" },
   transcribing: { label: "Transcribing...", color: "bg-yellow-100 text-yellow-800", icon: "🎙️" },
   transcribed: { label: "Transcribed", color: "bg-blue-100 text-blue-800", icon: "📝" },
   analyzing: { label: "Analyzing...", color: "bg-purple-100 text-purple-800", icon: "🧠" },
@@ -32,7 +39,7 @@ const STATUS_CONFIG: Record<
 
 function StatusBadge({ status }: { status: LessonStatus }) {
   const config = STATUS_CONFIG[status] || STATUS_CONFIG.uploaded;
-  const isProcessing = ["transcribing", "analyzing", "generating_homework"].includes(status);
+  const isProcessing = ["bot_joining", "bot_waiting", "bot_recording", "bot_done", "transcribing", "analyzing", "generating_homework"].includes(status);
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${config.color}`}>
       {isProcessing && <Loader2 className="w-3 h-3 animate-spin" />}
@@ -295,12 +302,17 @@ export default function DashboardPage() {
               className="w-full text-left bg-white border rounded-lg p-4 hover:border-blue-300 hover:shadow-sm transition-all flex items-center justify-between group"
             >
               <div className="flex items-center gap-4">
-                <div className="bg-blue-50 rounded-lg p-2">
-                  <FileText className="w-5 h-5 text-blue-600" />
+                <div className={`rounded-lg p-2 ${lesson.source === "live" ? "bg-red-50" : "bg-blue-50"}`}>
+                  {lesson.source === "live" ? (
+                    <Radio className="w-5 h-5 text-red-600" />
+                  ) : (
+                    <Upload className="w-5 h-5 text-blue-600" />
+                  )}
                 </div>
                 <div>
                   <p className="font-medium text-sm">
-                    Lesson {new Date(lesson.created_at).toLocaleDateString()}
+                    {lesson.source === "live" ? "Live Lesson" : "Uploaded Lesson"}{" "}
+                    {new Date(lesson.created_at).toLocaleDateString()}
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">
                     {new Date(lesson.created_at).toLocaleTimeString()}

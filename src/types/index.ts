@@ -4,8 +4,15 @@
 
 export type UserRole = "teacher" | "student" | "admin";
 
+export type LessonSource = "upload" | "live";
+
 export type LessonStatus =
   | "uploaded"
+  | "bot_joining"
+  | "bot_waiting"
+  | "bot_recording"
+  | "bot_done"
+  | "bot_error"
   | "transcribing"
   | "transcribed"
   | "analyzing"
@@ -43,7 +50,10 @@ export interface DBLesson {
   id: string;
   teacher_id: string;
   student_id: string | null;
-  file_url: string;
+  source: LessonSource;
+  meeting_url: string | null;
+  recall_bot_id: string | null;
+  file_url: string | null;
   transcript: string | null;
   summary: string | null;
   understanding_score: number | null;
@@ -98,6 +108,32 @@ export interface PipelineStepResult<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
+}
+
+// ---- Meeting bot types ----
+
+export type RecallBotStatus =
+  | "joining_call"
+  | "in_waiting_room"
+  | "in_call_not_recording"
+  | "in_call_recording"
+  | "call_ended"
+  | "done"
+  | "fatal";
+
+export interface RecallBotEvent {
+  event: string;
+  data: {
+    data: {
+      code: string;
+      sub_code: string | null;
+      updated_at: string;
+    };
+    bot: {
+      id: string;
+      metadata: Record<string, unknown>;
+    };
+  };
 }
 
 // ---- Future hooks ----
