@@ -17,8 +17,16 @@ import {
   Copy,
   Check,
   GraduationCap,
+  Shield,
+  Users,
 } from "lucide-react";
-import type { DBLesson, DBWeakness, DBHomework, DBInvitation, LessonStatus } from "@/types";
+import type { DBLesson, DBWeakness, DBHomework, DBInvitation, DBTeacher, LessonStatus } from "@/types";
+
+interface AdminTeacher extends DBTeacher {
+  email: string;
+  lesson_count: number;
+  student_count: number;
+}
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -80,6 +88,10 @@ export default function DashboardPage() {
   const [invitations, setInvitations] = useState<DBInvitation[]>([]);
   const [copied, setCopied] = useState(false);
 
+  // Admin state
+  const [teachers, setTeachers] = useState<AdminTeacher[]>([]);
+  const [showTeachers, setShowTeachers] = useState(false);
+
   // Fetch current user info
   useEffect(() => {
     fetch("/api/me")
@@ -89,6 +101,7 @@ export default function DashboardPage() {
   }, []);
 
   const isStudent = userInfo?.role === "student";
+  const isAdmin = userInfo?.role === "admin";
   const lessonsEndpoint = isStudent ? "/api/student/lessons" : "/api/lessons";
 
   // Fetch all lessons
@@ -135,13 +148,26 @@ export default function DashboardPage() {
     } catch { /* ignore */ }
   }, [isStudent]);
 
+  // Fetch teachers (admin only)
+  const fetchTeachers = useCallback(async () => {
+    if (!isAdmin) return;
+    try {
+      const res = await fetch("/api/admin/teachers");
+      if (res.ok) {
+        const data = await res.json();
+        setTeachers(data.teachers || []);
+      }
+    } catch { /* ignore */ }
+  }, [isAdmin]);
+
   // Polling for status updates
   useEffect(() => {
     fetchLessons();
     fetchInvitations();
+    fetchTeachers();
     const interval = setInterval(fetchLessons, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [fetchLessons, fetchInvitations]);
+  }, [fetchLessons, fetchInvitations, fetchTeachers]);
 
   // Refresh detail if selected lesson is processing
   useEffect(() => {
@@ -342,18 +368,31 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold">
-            {isStudent ? "My Lessons" : "Lessons"}
+            {isAdmin ? "Admin Dashboard" : isStudent ? "My Lessons" : "Lessons"}
           </h1>
           <p className="text-gray-500 text-sm mt-1">
+            {isAdmin && (
+              <span className="inline-flex items-center gap-1 mr-2 px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium">
+                <Shield className="w-3 h-3" /> Admin
+              </span>
+            )}
             {isStudent && (
               <span className="inline-flex items-center gap-1 mr-2 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
                 <GraduationCap className="w-3 h-3" /> Student
               </span>
             )}
-            {lessons.length} lesson{lessons.length !== 1 ? "s" : ""} — auto-refreshing every {POLL_INTERVAL_MS / 1000}s
+            {lessons.length} lesson{lessons.length !== 1 ? "s" : ""} across {isAdmin ? "all teachers" : "your account"}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {isAdmin && (
+            <button
+              onClick={() => setShowTeachers(!showTeachers)}
+              className="flex items-center gap-1.5 text-sm text-red-600 hover:text-red-800 border border-red-200 rounded-lg px-3 py-2"
+            >
+              <Users className="w-4 h-4" /> Teachers ({teachers.length})
+            </button>
+          )}
           {!isStudent && (
             <button
               onClick={() => setShowInviteForm(!showInviteForm)}
@@ -370,6 +409,37 @@ export default function DashboardPage() {
           </button>
         </div>
       </div>
+
+      {/* Admin Teachers Panel */}
+      {showTeachers && isAdmin && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-5 mb-6">
+          <h2 className="text-sm font-semibold text-red-800 mb-3 flex items-center gap-2">
+            <Users className="w-4 h-4" /> All Teachers
+          </h2>
+          {teachers.length === 0 ? (
+            <p className="text-sm text-red-600">No teachers registered yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {teachers.map((t) => (
+                <div key={t.id} className="flex items-center justify-between bg-white rounded-lg px-4 py-3 border">
+                  <div>
+                    <p className="font-medium text-sm">{t.name}</p>
+                    <p className="text-xs text-gray-500">{t.email}</p>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">
+                      {t.lesson_count} lesson{t.lesson_count !== 1 ? "s" : ""}
+                    </span>
+                    <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full font-medium">
+                      {t.student_count} student{t.student_count !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Invite Student Form (teachers only) */}
       {showInviteForm && !isStudent && (

@@ -49,7 +49,34 @@ export async function GET(request: Request) {
       return NextResponse.json({ lessons });
     }
 
-    // Teacher or admin — ensureTeacher handles provisioning
+    // Admin — sees ALL lessons across all teachers
+    if (role === "admin") {
+      if (lessonId) {
+        const lesson = await queryOne<DBLesson>(
+          "SELECT * FROM lessons WHERE id = $1",
+          [lessonId]
+        );
+        if (!lesson) {
+          return NextResponse.json({ error: "Lesson not found" }, { status: 404 });
+        }
+        const weaknesses = await query<DBWeakness>(
+          "SELECT * FROM weaknesses WHERE lesson_id = $1 ORDER BY confidence DESC",
+          [lessonId]
+        );
+        const homework = await query<DBHomework>(
+          "SELECT * FROM homework WHERE lesson_id = $1 ORDER BY difficulty",
+          [lessonId]
+        );
+        return NextResponse.json({ lesson, weaknesses, homework });
+      }
+
+      const lessons = await query<DBLesson>(
+        "SELECT * FROM lessons ORDER BY created_at DESC"
+      );
+      return NextResponse.json({ lessons });
+    }
+
+    // Teacher — ensureTeacher handles provisioning
     const teacher = await ensureTeacher(session);
 
     if (lessonId) {
