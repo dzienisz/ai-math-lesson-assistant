@@ -24,10 +24,12 @@ function LoginForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "signup" | "forgot" | "reset">("login");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [otp, setOtp] = useState("");
+  const [newPassword, setNewPassword] = useState("");
 
   // Invite state
   const [inviteValid, setInviteValid] = useState<boolean | null>(null);
@@ -63,6 +65,26 @@ function LoginForm() {
     setMessage(null);
 
     try {
+      if (mode === "forgot") {
+        const { error: err } = await authClient.forgetPassword.emailOtp({ email });
+        if (err) throw new Error(err.message || "Failed to send OTP");
+        setMessage("Check your email for a one-time code.");
+        setMode("reset");
+        setLoading(false);
+        return;
+      }
+
+      if (mode === "reset") {
+        const { error: err } = await authClient.emailOtp.resetPassword({ email, otp, password: newPassword });
+        if (err) throw new Error(err.message || "Failed to reset password");
+        setMessage("Password updated. You can now sign in.");
+        setMode("login");
+        setOtp("");
+        setNewPassword("");
+        setLoading(false);
+        return;
+      }
+
       if (mode === "signup") {
         const { error: signUpError } = await authClient.signUp.email({
           name: name || email.split("@")[0],
@@ -116,7 +138,11 @@ function LoginForm() {
               ? `Welcome, ${inviteStudentName}! Create your student account`
               : mode === "login"
               ? "Sign in to your account"
-              : "Create a new teacher account"}
+              : mode === "signup"
+              ? "Create a new teacher account"
+              : mode === "forgot"
+              ? "Enter your email to receive a reset code"
+              : "Enter the code from your email"}
           </p>
           {isStudentInvite && (
             <div className="inline-flex items-center gap-1.5 mt-2 px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
@@ -164,6 +190,55 @@ function LoginForm() {
             </div>
           </div>
 
+          {mode === "forgot" && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  placeholder="your@email.com"
+                  className="w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                />
+              </div>
+            </div>
+          )}
+
+          {mode === "reset" && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">OTP Code</label>
+                <input
+                  type="text"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  required
+                  placeholder="123456"
+                  className="w-full px-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    placeholder="••••••••"
+                    className="w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {(mode === "login" || mode === "signup") && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Password
@@ -180,7 +255,19 @@ function LoginForm() {
                 className="w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               />
             </div>
+            {mode === "login" && (
+              <div className="text-right mt-1">
+                <button
+                  type="button"
+                  onClick={() => { setMode("forgot"); setError(null); setMessage(null); }}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
           </div>
+          )}
 
           {error && (
             <div className="bg-red-50 text-red-700 rounded-lg p-3 text-sm border border-red-200">
@@ -203,12 +290,28 @@ function LoginForm() {
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : mode === "login" ? (
               "Sign In"
-            ) : (
+            ) : mode === "signup" ? (
               "Create Account"
+            ) : mode === "forgot" ? (
+              "Send Code"
+            ) : (
+              "Reset Password"
             )}
           </button>
 
-          {!isStudentInvite && (
+          {(mode === "forgot" || mode === "reset") && (
+            <div className="text-center text-sm text-gray-500">
+              <button
+                type="button"
+                onClick={() => { setMode("login"); setError(null); setMessage(null); }}
+                className="text-blue-600 hover:underline font-medium"
+              >
+                Back to sign in
+              </button>
+            </div>
+          )}
+
+          {!isStudentInvite && mode !== "forgot" && mode !== "reset" && (
             <div className="text-center text-sm text-gray-500">
               {mode === "login" ? (
                 <>
