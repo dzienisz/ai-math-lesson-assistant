@@ -21,6 +21,7 @@ import {
   Users,
 } from "lucide-react";
 import type { DBLesson, DBWeakness, DBHomework, DBInvitation, LessonStatus } from "@/types";
+import StudentProgress from "@/components/student-progress";
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -465,27 +466,8 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Weaknesses summary */}
-            {studentWeaknesses.length > 0 && (
-              <div className="bg-white border rounded-lg p-5">
-                <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                  <AlertCircle className="w-4 h-4" /> All Weaknesses
-                </h2>
-                <div className="space-y-2">
-                  {studentWeaknesses.slice(0, 10).map((w) => (
-                    <div key={w.id} className="flex items-center justify-between bg-orange-50 rounded-lg px-4 py-2">
-                      <span className="font-medium text-sm">{w.topic}</span>
-                      <span className="text-xs text-gray-500">Confidence: {(Number(w.confidence) * 100).toFixed(0)}%</span>
-                    </div>
-                  ))}
-                  {studentWeaknesses.length > 10 && (
-                    <p className="text-xs text-gray-400 text-center mt-2">
-                      +{studentWeaknesses.length - 10} more
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
+            {/* Progress over time + weaknesses aggregated by topic */}
+            <StudentProgress lessons={studentLessons} weaknesses={studentWeaknesses} />
 
             {/* Lessons list */}
             <div>
