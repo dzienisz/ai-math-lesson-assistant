@@ -137,9 +137,15 @@ function ScoreTrend({ series }: { series: ScorePoint[] }) {
         ))}
       </svg>
 
-      <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+      <div
+        className={`flex text-[10px] text-gray-400 mt-1 ${
+          series.length > 1 ? "justify-between" : "justify-center"
+        }`}
+      >
         <span>{new Date(series[0].date).toLocaleDateString()}</span>
-        <span>{new Date(series[series.length - 1].date).toLocaleDateString()}</span>
+        {series.length > 1 && (
+          <span>{new Date(series[series.length - 1].date).toLocaleDateString()}</span>
+        )}
       </div>
     </div>
   );
