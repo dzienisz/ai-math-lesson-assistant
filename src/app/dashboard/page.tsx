@@ -19,6 +19,10 @@ import {
   GraduationCap,
   Shield,
   Users,
+  UserPlus2,
+  Pencil,
+  Trash2,
+  X,
 } from "lucide-react";
 import type { DBLesson, DBWeakness, DBHomework, DBInvitation, LessonStatus } from "@/types";
 
@@ -97,6 +101,18 @@ export default function DashboardPage() {
 
   // Student's own lessons (when logged in as student)
   const [myLessons, setMyLessons] = useState<DBLesson[]>([]);
+
+  // Add-student (manual, no invitation) state
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addGrade, setAddGrade] = useState("");
+  const [addLoading, setAddLoading] = useState(false);
+
+  // Edit-student state (student detail view)
+  const [editingStudent, setEditingStudent] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editGrade, setEditGrade] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
 
   // Invite state
   const [showInviteForm, setShowInviteForm] = useState(false);
@@ -266,6 +282,92 @@ export default function DashboardPage() {
     }
   };
 
+  // Add a student manually (no invitation / account)
+  const handleAddStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddLoading(true);
+    try {
+      const res = await fetch("/api/students", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: addName, grade: addGrade || undefined }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to add student");
+      }
+      setAddName("");
+      setAddGrade("");
+      setShowAddForm(false);
+      setError(null);
+      fetchStudents();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add student");
+    } finally {
+      setAddLoading(false);
+    }
+  };
+
+  // Save edits to the currently selected student
+  const handleSaveStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStudent) return;
+    setEditLoading(true);
+    try {
+      const res = await fetch(`/api/students/${selectedStudent.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editName, grade: editGrade || null }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to update student");
+      }
+      const data = await res.json();
+      setSelectedStudent({ ...selectedStudent, ...data.student });
+      setEditingStudent(false);
+      setError(null);
+      fetchStudents();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update student");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  // Delete the currently selected student (past lessons are kept but unlinked)
+  const handleDeleteStudent = async () => {
+    if (!selectedStudent) return;
+    if (
+      !confirm(
+        `Delete ${selectedStudent.name}? Their past lessons are kept but will no longer be linked to a student.`
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/students/${selectedStudent.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to delete student");
+      }
+      setError(null);
+      backToStudents();
+      fetchStudents();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete student");
+    }
+  };
+
+  const startEditingStudent = () => {
+    if (!selectedStudent) return;
+    setEditName(selectedStudent.name);
+    setEditGrade(selectedStudent.grade || "");
+    setEditingStudent(true);
+  };
+
   const openStudent = (s: StudentWithStats) => {
     setSelectedStudent(s);
     setSelectedLesson(null);
@@ -416,32 +518,89 @@ export default function DashboardPage() {
         </button>
 
         {/* Student header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <GraduationCap className="w-6 h-6 text-purple-600" />
-              {selectedStudent.name}
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              {selectedStudent.grade && <span className="mr-2">Grade {selectedStudent.grade}</span>}
-              {isAdmin && <span className="text-xs text-gray-400">Teacher: {selectedStudent.teacher_name}</span>}
-            </p>
+        {editingStudent ? (
+          <form
+            onSubmit={handleSaveStudent}
+            className="bg-purple-50 border border-purple-200 rounded-lg p-5 mb-6 space-y-3"
+          >
+            <h2 className="text-sm font-semibold text-purple-800">Edit Student</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                required
+                placeholder="Student name"
+                className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+              />
+              <input
+                type="text"
+                value={editGrade}
+                onChange={(e) => setEditGrade(e.target.value)}
+                placeholder="Grade (optional)"
+                className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="submit"
+                disabled={editLoading}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:bg-gray-300 flex items-center gap-2"
+              >
+                {editLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingStudent(false)}
+                className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50 flex items-center gap-2"
+              >
+                <X className="w-4 h-4" /> Cancel
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                <GraduationCap className="w-6 h-6 text-purple-600" />
+                {selectedStudent.name}
+              </h1>
+              <p className="text-sm text-gray-500 mt-1">
+                {selectedStudent.grade && <span className="mr-2">Grade {selectedStudent.grade}</span>}
+                {isAdmin && <span className="text-xs text-gray-400">Teacher: {selectedStudent.teacher_name}</span>}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={startEditingStudent}
+                title="Edit student"
+                className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-800 border rounded-lg px-3 py-2"
+              >
+                <Pencil className="w-4 h-4" /> Edit
+              </button>
+              <button
+                onClick={handleDeleteStudent}
+                title="Delete student"
+                className="flex items-center gap-1.5 text-sm text-red-600 hover:text-red-800 border border-red-200 rounded-lg px-3 py-2"
+              >
+                <Trash2 className="w-4 h-4" /> Delete
+              </button>
+              <a
+                href={`/upload?studentId=${selectedStudent.id}`}
+                className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 border border-blue-200 rounded-lg px-3 py-2"
+              >
+                <Upload className="w-4 h-4" /> Upload Lesson
+              </a>
+              <a
+                href={`/live-lesson?studentId=${selectedStudent.id}`}
+                className="flex items-center gap-1.5 text-sm text-red-600 hover:text-red-800 border border-red-200 rounded-lg px-3 py-2"
+              >
+                <Radio className="w-4 h-4" /> Live Lesson
+              </a>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <a
-              href={`/upload?studentId=${selectedStudent.id}`}
-              className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 border border-blue-200 rounded-lg px-3 py-2"
-            >
-              <Upload className="w-4 h-4" /> Upload Lesson
-            </a>
-            <a
-              href={`/live-lesson?studentId=${selectedStudent.id}`}
-              className="flex items-center gap-1.5 text-sm text-red-600 hover:text-red-800 border border-red-200 rounded-lg px-3 py-2"
-            >
-              <Radio className="w-4 h-4" /> Live Lesson
-            </a>
-          </div>
-        </div>
+        )}
 
         {studentDetailLoading && studentLessons.length === 0 ? (
           <div className="flex justify-center py-12">
@@ -628,7 +787,13 @@ export default function DashboardPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowInviteForm(!showInviteForm)}
+            onClick={() => { setShowAddForm(!showAddForm); setShowInviteForm(false); }}
+            className="flex items-center gap-1.5 text-sm text-white bg-purple-600 hover:bg-purple-700 rounded-lg px-3 py-2"
+          >
+            <UserPlus2 className="w-4 h-4" /> Add Student
+          </button>
+          <button
+            onClick={() => { setShowInviteForm(!showInviteForm); setShowAddForm(false); }}
             className="flex items-center gap-1.5 text-sm text-purple-600 hover:text-purple-800 border border-purple-200 rounded-lg px-3 py-2"
           >
             <UserPlus className="w-4 h-4" /> Invite Student
@@ -641,6 +806,31 @@ export default function DashboardPage() {
           </button>
         </div>
       </div>
+
+      {/* Add Student Form (manual — no invitation required) */}
+      {showAddForm && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-5 mb-6">
+          <h2 className="text-sm font-semibold text-purple-800 mb-1">Add a Student</h2>
+          <p className="text-xs text-purple-700/70 mb-3">
+            Create a student record to start tracking lessons and progress. No email or account needed — invite them later if you want them to log in.
+          </p>
+          <form onSubmit={handleAddStudent} className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input type="text" value={addName} onChange={(e) => setAddName(e.target.value)} required placeholder="Student name" className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none" />
+              <input type="text" value={addGrade} onChange={(e) => setAddGrade(e.target.value)} placeholder="Grade (optional)" className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none" />
+            </div>
+            <div className="flex items-center gap-2">
+              <button type="submit" disabled={addLoading} className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:bg-gray-300 flex items-center gap-2">
+                {addLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus2 className="w-4 h-4" />}
+                Add Student
+              </button>
+              <button type="button" onClick={() => setShowAddForm(false)} className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50 flex items-center gap-2">
+                <X className="w-4 h-4" /> Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Invite Student Form */}
       {showInviteForm && (
@@ -698,13 +888,21 @@ export default function DashboardPage() {
         <div className="text-center py-16 text-gray-500">
           <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
           <p className="text-lg font-medium">No students yet</p>
-          <p className="text-sm mt-1">Invite your first student to get started.</p>
-          <button
-            onClick={() => setShowInviteForm(true)}
-            className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700"
-          >
-            <UserPlus className="w-4 h-4" /> Invite Student
-          </button>
+          <p className="text-sm mt-1">Add your first student to get started.</p>
+          <div className="flex items-center justify-center gap-2 mt-4">
+            <button
+              onClick={() => { setShowAddForm(true); setShowInviteForm(false); }}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700"
+            >
+              <UserPlus2 className="w-4 h-4" /> Add Student
+            </button>
+            <button
+              onClick={() => { setShowInviteForm(true); setShowAddForm(false); }}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-purple-200 text-purple-600 rounded-lg text-sm font-medium hover:bg-purple-50"
+            >
+              <UserPlus className="w-4 h-4" /> Invite Student
+            </button>
+          </div>
         </div>
       ) : (
         <div className="space-y-3">

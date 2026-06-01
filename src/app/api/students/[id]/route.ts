@@ -75,3 +75,110 @@ export async function GET(
     );
   }
 }
+
+// Resolve the student the current user is allowed to mutate (own student for
+// teachers, any student for admins). Returns null when not found/permitted.
+async function getEditableStudent(
+  session: { user: { id: string; email?: string; name?: string } },
+  studentId: string
+): Promise<DBStudent | null> {
+  const role = await getUserRole(session.user.id);
+  if (role === "admin") {
+    return queryOne<DBStudent>("SELECT * FROM students WHERE id = $1", [
+      studentId,
+    ]);
+  }
+  const teacher = await ensureTeacher(session);
+  return queryOne<DBStudent>(
+    "SELECT * FROM students WHERE id = $1 AND teacher_id = $2",
+    [studentId, teacher.id]
+  );
+}
+
+// PATCH — teacher/admin edits a student's name/grade
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const neonAuth = requireAuth();
+    const { data: session } = await neonAuth.getSession();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const role = await getUserRole(session.user.id);
+    if (role === "student") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const { id: studentId } = await params;
+    const existing = await getEditableStudent(session, studentId);
+    if (!existing) {
+      return NextResponse.json({ error: "Student not found" }, { status: 404 });
+    }
+
+    const body = await request.json();
+    const name =
+      typeof body.name === "string" ? body.name.trim() : existing.name;
+    const grade =
+      body.grade === undefined
+        ? existing.grade
+        : typeof body.grade === "string" && body.grade.trim() !== ""
+          ? body.grade.trim()
+          : null;
+
+    if (!name) {
+      return NextResponse.json({ error: "name cannot be empty" }, { status: 400 });
+    }
+
+    const rows = await query<DBStudent>(
+      `UPDATE students SET name = $1, grade = $2 WHERE id = $3 RETURNING *`,
+      [name, grade, studentId]
+    );
+
+    return NextResponse.json({ student: rows[0] });
+  } catch (err) {
+    console.error("[API] Update student error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to update student" },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE — teacher/admin removes a student. Past lessons are kept but unlinked
+// (lessons.student_id is ON DELETE SET NULL in the schema).
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const neonAuth = requireAuth();
+    const { data: session } = await neonAuth.getSession();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const role = await getUserRole(session.user.id);
+    if (role === "student") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const { id: studentId } = await params;
+    const existing = await getEditableStudent(session, studentId);
+    if (!existing) {
+      return NextResponse.json({ error: "Student not found" }, { status: 404 });
+    }
+
+    await query("DELETE FROM students WHERE id = $1", [studentId]);
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("[API] Delete student error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to delete student" },
+      { status: 500 }
+    );
+  }
+}
